@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+#carrIOTA field autoupdater
+#https://github.com/SemkoDev/field.cli/releases
+#INSTALLATION EXAMPLE
+#echo '*/15 * * * * root bash -c "bash <(curl -s https://raw.githubusercontent.com/wusyong/field_updater/master/updater)"' | sudo tee /etc/cron.d/field_updater > /dev/null
+
+set -euo pipefail
+
+readonly SCRIPT_NAME=$(basename $0)
+
+function get_latest_github_release {
+  curl -s -m 20  https://api.github.com/repos/SemkoDev/field.cli/releases/latest | awk '/tag_name/{print $2}' | tr -d '"v,' | cut -d- -f1
+}
+
+function get_installed_version {
+  field -V
+}
+
+log() {
+  echo "$@"
+  logger -p user.notice -t $SCRIPT_NAME "$@"
+}
+
+function update_field {
+	log "New field.cli release $latest detected! Updating installed version $installed to the latest release $latest"
+	service field stop
+	npm install -g field.cli@$latest
+	service field start
+	field -V
+}
+
+function main {
+  local latest="$(get_latest_github_release)"
+  local installed="$(get_installed_version)"
+
+  if (( $(awk 'BEGIN {print ("'$latest'" > "'$installed'")}') )); then
+    update_field
+  fi
+}
+
+main
